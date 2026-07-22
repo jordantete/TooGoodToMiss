@@ -6,10 +6,10 @@ from app.common.logger import LOGGER
 from app.core.state import StateStore
 
 class Scheduler:
-    MORNING_WINDOW = ((10, 12), (10, 20))    # 10:00-12:00, delai 10-20 min
-    AFTERNOON_WINDOW = ((12, 19), (2, 5))    # 12:00-19:00, delai 2-5 min
-    OFF_WINDOW_RETRY_MINUTES = 30            # re-verification hors fenetre / dimanche
-    COOLDOWN_MARGIN_SECONDS = 60             # marge pour ne pas se reveiller pile a l'expiration
+    MORNING_WINDOW = ((10, 12), (10, 20))    # 10:00-12:00, delay 10-20 min
+    AFTERNOON_WINDOW = ((12, 19), (2, 5))    # 12:00-19:00, delay 2-5 min
+    OFF_WINDOW_RETRY_MINUTES = 30            # re-check delay outside the windows / on Sundays
+    COOLDOWN_MARGIN_SECONDS = 60             # margin so we never wake up exactly at expiry
 
     def __init__(
         self,

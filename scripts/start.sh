@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# start.sh — lance le bot en avant-plan (appele par la session tmux dans deploy.sh).
+# start.sh - run the bot in the foreground (invoked by the tmux session in deploy.sh).
 
 set -euo pipefail
 cd "$(dirname "$0")/.."
@@ -12,5 +12,5 @@ if [[ -f .env ]]; then
     set +a
 fi
 
-echo "Demarrage toogoodtomiss a $(date -u +%Y-%m-%dT%H:%M:%SZ) ..." >> logs/app.log
+echo "Starting toogoodtomiss at $(date -u +%Y-%m-%dT%H:%M:%SZ) ..." >> logs/app.log
 exec ./.venv/bin/python -m app.main >> logs/app.log 2>&1

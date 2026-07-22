@@ -1,16 +1,16 @@
 #!/usr/bin/env bash
-# deploy.sh — synchronise le code local vers le VPS et (re)lance le bot dans tmux.
+# deploy.sh - sync local code to the VPS and (re)start the bot inside tmux.
 #
-# Config attendue dans .env (a la racine du projet) :
-#   VPS_USER, VPS_HOST                (obligatoires)
-#   VPS_BOT_PATH   (defaut /root/toogoodtomiss)
-#   SSH_KEY        (defaut ~/.ssh/id_ed25519)
+# Expected configuration in .env (at the project root):
+#   VPS_USER, VPS_HOST                (required)
+#   VPS_BOT_PATH   (default /root/toogoodtomiss)
+#   SSH_KEY        (default ~/.ssh/id_ed25519)
 #
-# ATTENTION - state.json n'est JAMAIS pousse sur le VPS. Il porte la session
-# TGTG vivante, que le bot rafraichit en continu ; l'ecraser par la copie
-# locale perimee declencherait un re-login, donc un CAPTCHA.
-# Corollaire: modifier ACCESS_TOKEN dans .env puis redeployer est SANS EFFET.
-# Pour forcer de nouveaux tokens :
+# WARNING - state.json is NEVER pushed to the VPS. It holds the live TGTG
+# session, which the bot refreshes continuously; overwriting it with the
+# stale local copy would trigger a re-login, and therefore a CAPTCHA.
+# Corollary: editing ACCESS_TOKEN in .env and redeploying has NO EFFECT.
+# To force new tokens:
 #     ssh $VPS_USER@$VPS_HOST "rm $VPS_BOT_PATH/state.json"
 
 set -euo pipefail
@@ -24,19 +24,19 @@ if [[ -f "$ENV_FILE" ]]; then
     source "$ENV_FILE"
     set +a
 else
-    echo "ERREUR : $ENV_FILE introuvable. Cree-le depuis .env.example." >&2
+    echo "ERROR: $ENV_FILE not found. Create it from .env.example." >&2
     exit 1
 fi
 
-: "${VPS_USER:?VPS_USER non defini dans .env}"
-: "${VPS_HOST:?VPS_HOST non defini dans .env}"
+: "${VPS_USER:?VPS_USER is not set in .env}"
+: "${VPS_HOST:?VPS_HOST is not set in .env}"
 : "${VPS_BOT_PATH:=/root/toogoodtomiss}"
 : "${SSH_KEY:=$HOME/.ssh/id_ed25519}"
 TMUX_SESSION="toogoodtomiss"
 
 SSH_CMD=(ssh -i "$SSH_KEY" "$VPS_USER@$VPS_HOST")
 
-echo "=== Deploiement vers $VPS_HOST:$VPS_BOT_PATH ==="
+echo "=== Deploying to $VPS_HOST:$VPS_BOT_PATH ==="
 
 "${SSH_CMD[@]}" "mkdir -p \"$VPS_BOT_PATH\""
 
@@ -63,6 +63,6 @@ rsync -av -e "ssh -i $SSH_KEY" "$ENV_FILE" "$VPS_USER@$VPS_HOST:$VPS_BOT_PATH/.e
 "${SSH_CMD[@]}" "tmux kill-session -t $TMUX_SESSION 2>/dev/null || true; \
     tmux new-session -d -s $TMUX_SESSION 'cd \"$VPS_BOT_PATH\" && ./scripts/start.sh'"
 
-echo "=== Deploiement termine ==="
+echo "=== Deployment complete ==="
 echo "Logs   : ${SSH_CMD[*]} 'tail -f $VPS_BOT_PATH/logs/app.log'"
-echo "Session: ${SSH_CMD[*]} 'tmux attach -t $TMUX_SESSION'   (detacher : Ctrl-b puis d)"
+echo "Session: ${SSH_CMD[*]} 'tmux attach -t $TMUX_SESSION'   (detach: Ctrl-b then d)"

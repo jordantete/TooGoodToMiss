@@ -44,7 +44,7 @@ class TestStateStore(unittest.TestCase):
 
     def test_seed_is_one_way_env_ignored_once_file_exists(self):
         self._store()
-        # Le .env change, mais state.json fait desormais autorite.
+        # The .env changes, but state.json is now the source of truth.
         store = self._store(ACCESS_TOKEN="brand-new-token")
         self.assertEqual(store.get_tgtg_credentials().access_token, "seed-access")
 

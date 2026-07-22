@@ -38,7 +38,7 @@ class TestMonitorJob(unittest.IsolatedAsyncioTestCase):
             monitor_cls.return_value.start_monitoring.assert_not_called()
         self.context.job_queue.run_once.assert_called_once()
 
-    @freeze_time("2026-07-26 14:00:00")  # dimanche
+    @freeze_time("2026-07-26 14:00:00")  # Sunday
     async def test_reschedules_on_sunday_without_monitoring(self):
         with patch("app.main.TgtgServiceMonitor") as monitor_cls:
             await monitor_job(self.context)
@@ -47,7 +47,7 @@ class TestMonitorJob(unittest.IsolatedAsyncioTestCase):
 
     @freeze_time("2026-07-22 10:30:00")
     async def test_reschedules_even_when_monitoring_raises(self):
-        """Garde-fou: une exception ne doit jamais tuer la boucle."""
+        """Guardrail: an exception must never kill the monitoring loop."""
         with patch("app.main.TgtgServiceMonitor") as monitor_cls:
             monitor_cls.return_value.start_monitoring.side_effect = RuntimeError("boom")
             await monitor_job(self.context)
