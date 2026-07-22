@@ -69,6 +69,14 @@ class TestScheduler(unittest.TestCase):
         self.scheduler.activate_cooldown(30)
         self.assertTrue(Scheduler(self.state).is_bot_paused())
 
+    @freeze_time("2026-07-22 03:00:00")  # hors fenetre
+    def test_should_monitor_now_false_outside_window(self):
+        self.assertFalse(self.scheduler.should_monitor_now())
+
+    @freeze_time("2026-07-22 10:30:00")  # mercredi, fenetre du matin
+    def test_should_monitor_now_true_in_window(self):
+        self.assertTrue(self.scheduler.should_monitor_now())
+
 
 if __name__ == "__main__":
     unittest.main()

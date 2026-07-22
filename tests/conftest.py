@@ -1,15 +1,5 @@
 import pytest
-from unittest.mock import MagicMock
-from app.core.scheduler import Scheduler
 from app.services.tgtg_service.models import ItemDetails, Store, Item, PickupInterval, PickupLocation, PriceInfo, Picture, Address
-
-@pytest.fixture
-def mock_tgtg_client():
-    return MagicMock()
-
-@pytest.fixture
-def mock_scheduler():
-    return MagicMock(spec=Scheduler)
 
 @pytest.fixture
 def mock_item_details():

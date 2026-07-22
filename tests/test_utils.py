@@ -68,7 +68,7 @@ class TestUtils:
     def test_send_telegram_message_failure(self, mock_logger, mock_env_vars, mock_requests):
         Utils.send_telegram_message("Test message")
         mock_requests.assert_called_once()
-        mock_logger.assert_called_once_with("Unexpected error while sending Telegram message: Network error")
+        mock_logger.assert_called_once_with("Unexpected error while sending Telegram message: Exception.")
 
     @patch("requests.get")
     def test_send_telegram_message_missing_bot_token(self, mock_requests):

@@ -77,10 +77,11 @@ class Utils:
             LOGGER.info(f"Telegram message sent successfully to chat_id: {chat_id}")
 
         except requests.RequestException as e:
-            LOGGER.error(f"Failed to send Telegram message to chat_id: {chat_id}. Error: {e}")
-            
+            status_code = e.response.status_code if e.response is not None else None
+            LOGGER.error(f"Failed to send Telegram message to chat_id: {chat_id}. {type(e).__name__} (status={status_code}).")
+
         except Exception as e:
-            LOGGER.error(f"Unexpected error while sending Telegram message: {e}")
+            LOGGER.error(f"Unexpected error while sending Telegram message: {type(e).__name__}.")
 
     @staticmethod
     def format_remaining_time(remaining_seconds: float) -> str:

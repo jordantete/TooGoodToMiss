@@ -107,8 +107,20 @@ class TelegramBotHandler:
     
     async def _wake_up_bot_handler(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         """Handle 'Wake Up Bot' command."""
+        from app.main import monitor_job  # local import to avoid a circular import with app.main
+
         chat_id = update.effective_chat.id
         self.scheduler.remove_cooldown()
+
+        for job in context.job_queue.get_jobs_by_name("monitoring"):
+            job.schedule_removal()
+        context.job_queue.run_once(
+            monitor_job,
+            when=0,
+            name="monitoring",
+            job_kwargs={"misfire_grace_time": None}
+        )
+
         success_message = self._get_localized_text("bot_wake_up_message")
         await context.bot.send_message(chat_id=chat_id, text=success_message, parse_mode=ParseMode.HTML)
 

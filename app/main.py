@@ -17,10 +17,10 @@ async def monitor_job(
     thing that re-arms monitoring. If it ever returns without scheduling a
     successor, monitoring stops until the process restarts.
     """
-    state: StateStore = context.bot_data["state"]
-    scheduler: Scheduler = context.bot_data["scheduler"]
-
     try:
+        state: StateStore = context.bot_data["state"]
+        scheduler: Scheduler = context.bot_data["scheduler"]
+
         if not scheduler.should_monitor_now():
             LOGGER.info("Monitoring skipped - bot paused, outside window, or Sunday.")
         else:
@@ -31,9 +31,25 @@ async def monitor_job(
         LOGGER.error(f"Monitoring pass failed: {e}")
 
     finally:
-        delay = scheduler.next_delay_seconds()
-        context.job_queue.run_once(monitor_job, when=delay, name="monitoring")
-        LOGGER.info(f"Next monitoring pass scheduled in {delay:.0f}s.")
+        try:
+            delay = scheduler.next_delay_seconds()
+            context.job_queue.run_once(
+                monitor_job,
+                when=delay,
+                name="monitoring",
+                job_kwargs={"misfire_grace_time": None}
+            )
+            LOGGER.info(f"Next monitoring pass scheduled in {delay:.0f}s.")
+
+        except Exception as e:
+            fallback_delay = Scheduler.OFF_WINDOW_RETRY_MINUTES * 60
+            LOGGER.error(f"Failed to compute/schedule next monitoring pass: {e}. Falling back to {fallback_delay}s.")
+            context.job_queue.run_once(
+                monitor_job,
+                when=fallback_delay,
+                name="monitoring",
+                job_kwargs={"misfire_grace_time": None}
+            )
 
 def build_application() -> Application:
     """Wire the state store, scheduler, Telegram handlers and monitoring job."""
@@ -51,7 +67,12 @@ def build_application() -> Application:
 
     application.bot_data["state"] = state
     application.bot_data["scheduler"] = scheduler
-    application.job_queue.run_once(monitor_job, when=0, name="monitoring")
+    application.job_queue.run_once(
+        monitor_job,
+        when=0,
+        name="monitoring",
+        job_kwargs={"misfire_grace_time": None}
+    )
     LOGGER.info("Monitoring loop armed.")
 
     return application
