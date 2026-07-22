@@ -1,4 +1,4 @@
-name: TooGoodNotify
+name: TooGoodToMiss
 channels:
   - defaults
 dependencies:

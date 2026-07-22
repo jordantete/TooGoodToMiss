@@ -13,7 +13,7 @@ class Scheduler:
         """Initialize the Scheduler."""
         aws_account_id = Utils.get_environment_variable("AWS_ACCOUNT_ID")
         aws_region = Utils.get_environment_variable("DEFAULT_AWS_REGION")
-        self.monitoring_lambda_arn = f"arn:aws:lambda:{aws_region}:{aws_account_id}:function:too-good-notify-monitoring"
+        self.monitoring_lambda_arn = f"arn:aws:lambda:{aws_region}:{aws_account_id}:function:too-good-to-miss-monitoring"
         self.events_client: boto3.client = boto3.client('events')
         self.lambda_client: boto3.client = boto3.client('lambda') 
 

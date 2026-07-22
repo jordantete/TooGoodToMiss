@@ -1,16 +1,16 @@
-# TooGoodNotify 
+# TooGoodToMiss 
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 
 
 <p align="center">
-  <img src="https://github.com/pownedjojo/TooGoodNotify/assets/2340374/f62f2f94-957d-4279-8c77-3214b687299b" alt="MarineGEO circle logo" style="height: 150px; width:150px;"/>
+  <img src="https://github.com/jordantete/TooGoodToMiss/assets/2340374/f62f2f94-957d-4279-8c77-3214b687299b" alt="MarineGEO circle logo" style="height: 150px; width:150px;"/>
 </p>
 
 
 ## 📌 Overview
 
-**TooGoodNotify** is a customizable notification bot for TooGoodToGo (TGTG) deals, designed to monitor TGTG magic bags and notify users via Telegram. The bot is built with a modular architecture and is optimized for efficient event-driven operations, making it easy to deploy in a serverless environment on AWS Lambda or any other cloud provider (GCP, Azure, etc.). It is ready to be customized and adapted to fit your needs.
+**TooGoodToMiss** is a customizable notification bot for TooGoodToGo (TGTG) deals, designed to monitor TGTG magic bags and notify users via Telegram. The bot is built with a modular architecture and is optimized for efficient event-driven operations, making it easy to deploy in a serverless environment on AWS Lambda or any other cloud provider (GCP, Azure, etc.). It is ready to be customized and adapted to fit your needs.
 
 ## 🚀 Features
 
@@ -36,14 +36,14 @@
 
 1. **Clone the Repository**:
   ```sh
-  git clone https://github.com/jordantete/TooGoodNotify.git
-  cd TooGoodNotify
+  git clone https://github.com/jordantete/TooGoodToMiss.git
+  cd TooGoodToMiss
   ```
 
 2. **Set Up Conda Environment**:
   ```sh
   conda env create -f environment.yml
-  conda activate too_good_notify_env
+  conda activate TooGoodToMiss
   ```
 
 3. **Configure Environment Variables in Conda**:
@@ -76,7 +76,7 @@ To create the Lambda layer, use the following commands:
       --only-binary=:all: \
       -r requirements_layer.txt
   zip -r lambda_layer.zip python/
-  aws lambda publish-layer-version --layer-name TooGoodNotifyLayer --description "Layer for dependencies" --zip-file fileb://lambda_layer.zip --compatible-runtimes python3.10
+  aws lambda publish-layer-version --layer-name TooGoodToMissLayer --description "Layer for dependencies" --zip-file fileb://lambda_layer.zip --compatible-runtimes python3.10
   ```
 
 ### ☁️ Cloud Deployment
@@ -135,4 +135,4 @@ Have any questions or feedback? Feel free to reach out via the issues tab on Git
 
 ## ❗ Disclaimer
 
-**TooGoodNotify** is an independent project and is not affiliated with, endorsed by, or officially connected to TooGoodToGo (TGTG) or any of its subsidiaries or affiliates. All product names, logos, and brands are property of their respective owners.
+**TooGoodToMiss** is an independent project and is not affiliated with, endorsed by, or officially connected to TooGoodToGo (TGTG) or any of its subsidiaries or affiliates. All product names, logos, and brands are property of their respective owners.

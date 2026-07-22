@@ -1,9 +1,9 @@
 {
     "en": {
-        "start-message": "👋 <b>Welcome to TooGoodNotify!</b>\n\nI'm here to help you get notified when TooGoodToGo magic bags are available. Use /help to see what I can do for you. 🎁",
+        "start-message": "👋 <b>Welcome to TooGoodToMiss!</b>\n\nI'm here to help you get notified when TooGoodToGo magic bags are available. Use /help to see what I can do for you. 🎁",
         "help-message": "🤔 <b>Need help?</b> Here are the commands you can use:\n\n- /start: <i>Start interacting with the bot</i>\n- /help: <i>Show this help message</i>\n- /settings: <i>Configure your preferences</i>\n- /pause: <i>Pause the bot and set a cooldown time</i>\n- /status: <i>Check the current bot status</i>\n- /wakeup: <i>Wake up the bot and remove the cooldown</i>\n- /about: <i>Learn more about this bot</i>",
         "settings-message": "⚙️ <b>Settings</b>\nHere you can configure your preferences:\n- Use /language to change your preferred language.\n- Use /notifications_start or /notifications_stop to control notifications.",
-        "about-message": "ℹ️ <b>About TooGoodNotify</b>\nThis bot helps you stay updated on TooGoodToGo magic bags from stores you’ve set as favorites in your TooGoodToGo app. 🚀 Please note, this bot is not officially affiliated with the TooGoodToGo company. The project is open-source and available on GitHub: <a href='https://github.com/jordantete/TooGoodNotify'>TooGoodNotify GitHub</a>.",
+        "about-message": "ℹ️ <b>About TooGoodToMiss</b>\nThis bot helps you stay updated on TooGoodToGo magic bags from stores you’ve set as favorites in your TooGoodToGo app. 🚀 Please note, this bot is not officially affiliated with the TooGoodToGo company. The project is open-source and available on GitHub: <a href='https://github.com/jordantete/TooGoodToMiss'>TooGoodToMiss GitHub</a>.",
         "language-selection": "🌍 <b>Choose your language:</b>",
         "language-message": "Your language has been set to <b>{language}</b>. Use /help if you need assistance. 😊",
         "command_start": "🚀 Start interacting with the bot",
@@ -34,10 +34,10 @@
         "settings_button": "⚙️ Settings"
     },
     "fr": {
-        "start-message": "👋 <b>Bienvenue sur TooGoodNotify!</b>\n\nJe suis là pour vous aider à recevoir des notifications lorsque des offres TooGoodToGo sont disponibles. Utilisez /help pour voir ce que je peux faire pour vous. 🎁",
+        "start-message": "👋 <b>Bienvenue sur TooGoodToMiss!</b>\n\nJe suis là pour vous aider à recevoir des notifications lorsque des offres TooGoodToGo sont disponibles. Utilisez /help pour voir ce que je peux faire pour vous. 🎁",
         "help-message": "🤔 <b>Besoin d'aide ?</b> Voici les commandes que vous pouvez utiliser :\n\n- /start: <i>Commencer à interagir avec le bot</i>\n- /help: <i>Afficher ce message d'aide</i>\n- /settings: <i>Configurer vos préférences</i>\n- /pause: <i>Mettre le bot en pause et définir un temps de cooldown</i>\n- /status: <i>Vérifier si le bot est actuellement en pause</i>\n- /wakeup: <i>Réveiller le bot et supprimer le cooldown</i>\n- /about: <i>En savoir plus sur ce bot</i>",
         "settings-message": "⚙️ <b>Paramètres</b>\nConfigurez vos préférences ici :\n- Utilisez /language pour changer votre langue.\n- Utilisez /notifications_start ou /notifications_stop pour contrôler les notifications.",
-        "about-message": "ℹ️ <b>À propos de TooGoodNotify</b>\nCe bot vous aide à rester informé des sacs magiques TooGoodToGo des magasins que vous avez définis comme favoris dans votre application TooGoodToGo. 🚀 Veuillez noter que ce bot n'est pas officiellement affilié à la société TooGoodToGo. Le projet est open-source et disponible sur GitHub : <a href='https://github.com/jordantete/TooGoodNotify'>TooGoodNotify GitHub</a>.",
+        "about-message": "ℹ️ <b>À propos de TooGoodToMiss</b>\nCe bot vous aide à rester informé des sacs magiques TooGoodToGo des magasins que vous avez définis comme favoris dans votre application TooGoodToGo. 🚀 Veuillez noter que ce bot n'est pas officiellement affilié à la société TooGoodToGo. Le projet est open-source et disponible sur GitHub : <a href='https://github.com/jordantete/TooGoodToMiss'>TooGoodToMiss GitHub</a>.",
         "language-selection": "🌍 <b>Choisissez votre langue :</b>",
         "language-message": "Votre langue a été définie sur <b>{language}</b>. Utilisez /help si vous avez besoin d'aide. 😊",
         "command_start": "🚀 Démarrez l'interaction avec le bot",

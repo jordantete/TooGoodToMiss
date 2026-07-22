@@ -1,4 +1,4 @@
-service: too-good-notify
+service: too-good-to-miss
 
 provider:
   name: aws
@@ -34,9 +34,9 @@ provider:
             - lambda:GetFunctionConfiguration
             - lambda:UpdateFunctionConfiguration
           Resource:
-            - "arn:aws:lambda:${self:provider.region}:${env:AWS_ACCOUNT_ID}:function:too-good-notify-scheduler"
-            - "arn:aws:lambda:${self:provider.region}:${env:AWS_ACCOUNT_ID}:function:too-good-notify-monitoring"
-            - "arn:aws:lambda:${self:provider.region}:${env:AWS_ACCOUNT_ID}:function:too-good-notify-telegram-webhook"
+            - "arn:aws:lambda:${self:provider.region}:${env:AWS_ACCOUNT_ID}:function:too-good-to-miss-scheduler"
+            - "arn:aws:lambda:${self:provider.region}:${env:AWS_ACCOUNT_ID}:function:too-good-to-miss-monitoring"
+            - "arn:aws:lambda:${self:provider.region}:${env:AWS_ACCOUNT_ID}:function:too-good-to-miss-telegram-webhook"
   environment:
     USER_EMAIL: ${env:USER_EMAIL}
     ACCESS_TOKEN: ${env:ACCESS_TOKEN}
@@ -51,22 +51,22 @@ provider:
     COOLDOWN_END_TIME: ${env:COOLDOWN_END_TIME}
 
 functions:
-  tooGoodNotifyScheduler:
-    name: too-good-notify-scheduler
+  tooGoodToMissScheduler:
+    name: too-good-to-miss-scheduler
     handler: app.handlers.lambda_scheduler
     layers:
-      - arn:aws:lambda:${self:provider.region}:${env:AWS_ACCOUNT_ID}:layer:TooGoodNotifyLayer:3
+      - arn:aws:lambda:${self:provider.region}:${env:AWS_ACCOUNT_ID}:layer:TooGoodToMissLayer:3
     events:
       - schedule: cron(*/3 10-19 ? * MON-SAT *)
     timeout: 15 # seconds
     memorySize: 128 # mb
     description: Schedule the monitoring of TooGoodToGo items available
 
-  tooGoodNotifyMonitoring:
-      name: too-good-notify-monitoring
+  tooGoodToMissMonitoring:
+      name: too-good-to-miss-monitoring
       handler: app.handlers.tgtg_monitoring_handler
       layers:
-        - arn:aws:lambda:${self:provider.region}:${env:AWS_ACCOUNT_ID}:layer:TooGoodNotifyLayer:3
+        - arn:aws:lambda:${self:provider.region}:${env:AWS_ACCOUNT_ID}:layer:TooGoodToMissLayer:3
       events:
         - eventBridge:
             pattern:
@@ -78,11 +78,11 @@ functions:
       memorySize: 256 # mb
       description: Monitor new TooGoodToGo items available in my favorite stores
 
-  tooGoodNotifyTelegramWebhook:
-    name: too-good-notify-telegram-webhook
+  tooGoodToMissTelegramWebhook:
+    name: too-good-to-miss-telegram-webhook
     handler: app.handlers.telegram_webhook_handler
     layers:
-      - arn:aws:lambda:${self:provider.region}:${env:AWS_ACCOUNT_ID}:layer:TooGoodNotifyLayer:3
+      - arn:aws:lambda:${self:provider.region}:${env:AWS_ACCOUNT_ID}:layer:TooGoodToMissLayer:3
     events:
       - http:
           path: /
@@ -90,7 +90,7 @@ functions:
           cors: true
     timeout: 30 # seconds
     memorySize: 256 # mb
-    description: Webhook to trigger TooGoodToNotify Telegram Bot
+    description: Webhook to trigger TooGoodToMiss Telegram Bot
 
 resources:
   Resources:

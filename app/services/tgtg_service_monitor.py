@@ -14,7 +14,7 @@ class TgtgServiceMonitor:
         self.last_time_token_refreshed: Optional[str] = Utils.get_environment_variable("LAST_TIME_TOKEN_REFRESHED")
         aws_account_id = Utils.get_environment_variable("AWS_ACCOUNT_ID")
         aws_region = Utils.get_environment_variable("DEFAULT_AWS_REGION")
-        self.monitoring_lambda_arn = f"arn:aws:lambda:{aws_region}:{aws_account_id}:function:too-good-notify-monitoring"
+        self.monitoring_lambda_arn = f"arn:aws:lambda:{aws_region}:{aws_account_id}:function:too-good-to-miss-monitoring"
         self.tgtg_service = TgtgService()
     
     def start_monitoring(self, scheduler: Scheduler) -> None:
@@ -85,7 +85,7 @@ class TgtgServiceMonitor:
         
         except Exception as e:
             LOGGER.error(f"Unexpected error in _monitor_favorites: {str(e)}")
-            Utils.send_telegram_message(f"TooGoodToNotify: Unexpected system error - {str(e)}")
+            Utils.send_telegram_message(f"TooGoodToMiss: Unexpected system error - {str(e)}")
     
     def update_credentials_env_vars(
         self, 

@@ -31,7 +31,7 @@ class TelegramBotHandler:
         self.user_language = Utils.get_environment_variable("USER_LANGUAGE", default="en")
         aws_account_id = Utils.get_environment_variable("AWS_ACCOUNT_ID")
         aws_region = Utils.get_environment_variable("DEFAULT_AWS_REGION")
-        self.telegram_lambda_arn = f"arn:aws:lambda:{aws_region}:{aws_account_id}:function:too-good-notify-telegram-webhook"
+        self.telegram_lambda_arn = f"arn:aws:lambda:{aws_region}:{aws_account_id}:function:too-good-to-miss-telegram-webhook"
         self.scheduler = scheduler
         self._register_handlers()
         LOGGER.info(f"TelegramBotHandler initialized with: user_language={self.user_language}")
