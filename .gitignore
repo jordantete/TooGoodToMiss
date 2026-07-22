@@ -19,8 +19,6 @@ var/
 *.egg-info/
 .installed.cfg
 *.egg
-node_modules
-.serverless/
 
 # Installer logs
 pip-log.txt
@@ -42,12 +40,5 @@ state.json
 state.json.tmp
 logs/
 
-# Conda
-conda_packages.txt
-
 # VSCode
 .vscode/
-
-# Ignore Lambda Layer Artifacts
-lambda_layer.zip
-python/
