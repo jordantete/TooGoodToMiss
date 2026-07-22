@@ -1,4 +1,4 @@
-import os, json, requests, boto3
+import os, json, requests
 from typing import Optional
 from urllib.parse import quote
 from app.common.logger import LOGGER
@@ -82,46 +82,6 @@ class Utils:
         except Exception as e:
             LOGGER.error(f"Unexpected error while sending Telegram message: {e}")
 
-    @staticmethod
-    def ok_response():
-        """Standard success response."""
-        return {
-            'statusCode': 200,
-            'headers': {'Content-Type': 'application/json'},
-            'body': json.dumps('ok')
-        }
-
-    @staticmethod
-    def error_response(message: str):
-        """Standard error response with a message."""
-        return {
-            'statusCode': 400,
-            'headers': {'Content-Type': 'application/json'},
-            'body': json.dumps(message)
-        }
-
-    @staticmethod
-    def update_lambda_env_vars(
-        lambda_arn: str, 
-        new_env_vars: dict
-    ) -> None:
-        """Update AWS Lambda environment variables with new values."""
-        try:
-            LOGGER.info(f"Updating AWS Lambda environment variables for {lambda_arn} - new_env_vars: {new_env_vars}")
-            lambda_client = boto3.client('lambda')
-            response = lambda_client.get_function_configuration(FunctionName=lambda_arn)
-            current_env_vars = response['Environment']['Variables']
-            LOGGER.info(f"Current environment variables: {current_env_vars}")
-
-            updated_env_vars = current_env_vars.copy()
-            updated_env_vars.update(new_env_vars)
-
-            lambda_client.update_function_configuration(FunctionName=lambda_arn, Environment={'Variables': updated_env_vars})
-            LOGGER.info("AWS Lambda environment variables updated successfully.")
-
-        except Exception as e:
-            raise Exception(f"Failed to update AWS Lambda environment variables: {e}")
-    
     @staticmethod
     def format_remaining_time(remaining_seconds: float) -> str:
         """Convert remaining seconds into a more readable format (e.g., hours, minutes, seconds)."""

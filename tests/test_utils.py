@@ -81,13 +81,3 @@ class TestUtils:
         with patch.dict(os.environ, {"TELEGRAM_BOT_TOKEN": "test_bot_token"}, clear=True):
             Utils.send_telegram_message("Test message")
             mock_requests.assert_not_called()
-
-    def test_ok_response(self):
-        response = Utils.ok_response()
-        assert response["statusCode"] == 200
-        assert response["body"] == '"ok"'
-
-    def test_error_response(self):
-        response = Utils.error_response("An error occurred")
-        assert response["statusCode"] == 400
-        assert response["body"] == '"An error occurred"'

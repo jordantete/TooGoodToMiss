@@ -1,14 +1,17 @@
-import pytest, pytz
+import pytest
+from pathlib import Path
+from tempfile import TemporaryDirectory
 from unittest.mock import patch, MagicMock
+from app.core.state import StateStore
 from app.services.tgtg_service.tgtg_service import TgtgService
 from app.services.tgtg_service.exceptions import TgtgAPIParsingError, ForbiddenError
 from app.services.tgtg_service.models import ItemDetails
-from datetime import datetime
 
 class TestTgtgService:
     @pytest.fixture
     def tgtg_service(self):
-        return TgtgService()
+        with TemporaryDirectory() as tmp_dir:
+            yield TgtgService(StateStore(Path(tmp_dir) / "state.json"))
 
     def test_init(self, tgtg_service):
         assert tgtg_service.credentials is None
@@ -67,20 +70,12 @@ class TestTgtgService:
             )
 
     def test_get_notification_messages(self, tgtg_service, mock_item_details):
-        mock_db_instance = MagicMock()
-        tgtg_service.database_handler = mock_db_instance
-        mock_db_instance.get_items.return_value = []
-
         messages = tgtg_service.get_notification_messages([mock_item_details])
 
         assert len(messages) == 1
         assert "Test Store" in messages[0]
 
-    def test_is_notification_sent_today(self, tgtg_service):
-        today_date = datetime.now(pytz.UTC).date()
-        notifications = [{"lastNotificationDate": today_date.isoformat()}]
+    def test_get_notification_messages_skips_store_already_notified_today(self, tgtg_service, mock_item_details):
+        tgtg_service.get_notification_messages([mock_item_details])
 
-        assert tgtg_service._is_notification_sent_today(notifications) is True
-
-        notifications = [{"lastNotificationDate": "2023-01-01T00:00:00Z"}]
-        assert tgtg_service._is_notification_sent_today(notifications) is False
+        assert tgtg_service.get_notification_messages([mock_item_details]) == []
