@@ -43,7 +43,7 @@ echo "=== Deploiement vers $VPS_HOST:$VPS_BOT_PATH ==="
 rsync -av --delete \
     --exclude '.env' \
     --exclude 'state.json' \
-    --exclude 'state.json.tmp' \
+    --exclude 'state.json.tmp*' \
     --exclude '.venv' \
     --exclude 'logs/' \
     --exclude '.pytest_cache' \
@@ -53,6 +53,7 @@ rsync -av --delete \
     "$PROJECT_DIR/" "$VPS_USER@$VPS_HOST:$VPS_BOT_PATH/"
 
 rsync -av -e "ssh -i $SSH_KEY" "$ENV_FILE" "$VPS_USER@$VPS_HOST:$VPS_BOT_PATH/.env"
+"${SSH_CMD[@]}" "chmod 600 \"$VPS_BOT_PATH/.env\""
 
 "${SSH_CMD[@]}" "cd \"$VPS_BOT_PATH\" && \
     { [ -d .venv ] || python3 -m venv .venv; } && \

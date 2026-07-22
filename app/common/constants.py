@@ -4,7 +4,6 @@ from typing import Dict
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 LOCALIZATIONS_FILE_PATH = os.path.join(BASE_DIR, "localizable.json")
 TELEGRAM_API_URL = "https://api.telegram.org/bot{token}/sendMessage"
-SCHEDULE_RULE_NAME_PREFIX = "TooGoodToGo_monitoring_invocation_rule_"
 WELCOME_GIF_URL = "https://i.giphy.com/media/v1.Y2lkPTc5MGI3NjExY3E3MW95YmwzdXd5ancwM2o1OGhiMTJiN25mem9kMDBuYnh2eWxlaSZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/XD9o33QG9BoMis7iM4/giphy.gif"
 
 WEEKDAY_MAP: Dict[int, str] = {

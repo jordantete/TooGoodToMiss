@@ -63,7 +63,7 @@ class TgtgService:
             json_data = tgtg_client.get_favorites()
             self.credentials = Credentials(tgtg_client.access_token, tgtg_client.refresh_token, tgtg_client.cookie, tgtg_client.last_time_token_refreshed)
             LOGGER.info("Local credentials updated after TGTG request.")
-            LOGGER.info(f"Raw API response: {json_data}")
+            LOGGER.debug(f"Raw API response: {json_data}")
             favorites = [ItemDetails(**item) for item in json_data]
             LOGGER.info(f"Parsed {len(favorites)} favorite items from TGTG API.")
             return favorites

@@ -2,6 +2,7 @@ import json
 import os
 import pytz
 import tempfile
+import threading
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -29,6 +30,7 @@ class StateStore:
         path: Path = DEFAULT_STATE_PATH
     ):
         self.path = Path(path)
+        self._lock = threading.Lock()
         self._state = self._load()
 
     def _load(self) -> dict:
@@ -97,6 +99,14 @@ class StateStore:
         monitoring pass in another thread) would otherwise share one temp file
         and interleave into invalid JSON. Same directory keeps os.replace atomic
         (only guaranteed within a single filesystem).
+
+        Callers that mutate self._state must hold self._lock across both the
+        mutation and this call (see _save() and its callers): json.dump with
+        indent=2 iterates the dict in pure Python, so a concurrent mutation of
+        self._state during serialization can raise "dictionary changed size
+        during iteration" and lose the write. The only exception is _load(),
+        which calls this directly during __init__, before any other thread
+        holds a reference to the store.
         """
         self._prune_notifications(state)
         fd, tmp_name = tempfile.mkstemp(
@@ -142,13 +152,14 @@ class StateStore:
         self,
         credentials: TgtgCredentials
     ) -> None:
-        self._state["tgtg"] = {
-            "access_token": credentials.access_token,
-            "refresh_token": credentials.refresh_token,
-            "cookie": credentials.cookie,
-            "last_time_token_refreshed": credentials.last_time_token_refreshed,
-        }
-        self._save()
+        with self._lock:
+            self._state["tgtg"] = {
+                "access_token": credentials.access_token,
+                "refresh_token": credentials.refresh_token,
+                "cookie": credentials.cookie,
+                "last_time_token_refreshed": credentials.last_time_token_refreshed,
+            }
+            self._save()
         LOGGER.info("TGTG credentials refreshed and persisted.")
 
     def cooldown_remaining(self) -> Optional[float]:
@@ -172,13 +183,15 @@ class StateStore:
         minutes: int
     ) -> None:
         end_time = datetime.now(pytz.utc) + timedelta(minutes=minutes)
-        self._state["cooldown_end_time"] = end_time.isoformat()
-        self._save()
+        with self._lock:
+            self._state["cooldown_end_time"] = end_time.isoformat()
+            self._save()
         LOGGER.info(f"Cooldown activated for {minutes} minutes.")
 
     def clear_cooldown(self) -> None:
-        self._state["cooldown_end_time"] = None
-        self._save()
+        with self._lock:
+            self._state["cooldown_end_time"] = None
+            self._save()
         LOGGER.info("Cooldown cleared.")
 
     def get_language(self) -> str:
@@ -188,8 +201,9 @@ class StateStore:
         self,
         language: str
     ) -> None:
-        self._state["user_language"] = language
-        self._save()
+        with self._lock:
+            self._state["user_language"] = language
+            self._save()
 
     def was_notified_today(
         self,
@@ -201,5 +215,6 @@ class StateStore:
         self,
         store_id: str
     ) -> None:
-        self._state.setdefault("notifications", {})[str(store_id)] = self._today()
-        self._save()
+        with self._lock:
+            self._state.setdefault("notifications", {})[str(store_id)] = self._today()
+            self._save()

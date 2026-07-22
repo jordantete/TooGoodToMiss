@@ -101,25 +101,34 @@ class TestStateStore(unittest.TestCase):
         self.assertEqual(os.stat(orphan_path).st_mode & 0o777, 0o644)
         self.assertEqual(os.stat(self.path).st_mode & 0o777, 0o600, "state.json must be 0o600 regardless of unrelated orphan tmp files")
 
+    @freeze_time("2026-07-22 10:00:00")
     def test_concurrent_writes_leave_state_file_valid_and_no_orphan_tmp(self):
-        """Regression test: two threads writing through the same StateStore
+        """Regression test: several threads writing through the same StateStore
         concurrently (e.g. /wakeup racing an in-flight monitoring pass) must
         never interleave into a corrupt state.json, and must never leave an
-        orphan temp file behind."""
+        orphan temp file behind.
+
+        Uses mark_notified, which ADDS a new key to self._state["notifications"]
+        on every call (unlike set_language, which only reassigns an existing
+        key and never changes dict size - that variant never exercises the
+        "dictionary changed size during iteration" path and passes even on
+        buggy, non-thread-safe code)."""
         store = self._store()
         errors = []
+        thread_count = 4
+        writes_per_thread = 300
 
-        def writer(language: str) -> None:
-            for _ in range(30):
+        def writer(thread_id: int) -> None:
+            for i in range(writes_per_thread):
                 try:
-                    store.set_language(language)
+                    store.mark_notified(f"{thread_id}-{i}")
                 except Exception as e:  # noqa: BLE001 - capturing to fail the test, not swallow
                     errors.append(e)
                     return
 
         threads = [
-            threading.Thread(target=writer, args=("en",)),
-            threading.Thread(target=writer, args=("fr",)),
+            threading.Thread(target=writer, args=(thread_id,))
+            for thread_id in range(thread_count)
         ]
         for thread in threads:
             thread.start()
@@ -130,7 +139,14 @@ class TestStateStore(unittest.TestCase):
 
         # state.json must always be valid, parsable JSON after concurrent writes.
         on_disk = json.loads(self.path.read_text(encoding="utf-8"))
-        self.assertIn(on_disk.get("user_language"), ("en", "fr"))
+
+        # Every write from every thread must be present - proves none was lost.
+        expected_keys = {
+            f"{thread_id}-{i}"
+            for thread_id in range(thread_count)
+            for i in range(writes_per_thread)
+        }
+        self.assertEqual(set(on_disk.get("notifications", {})), expected_keys)
 
         # No leftover temp files from any of the writes.
         leftovers = list(self.path.parent.glob(f"{self.path.name}.tmp*"))
