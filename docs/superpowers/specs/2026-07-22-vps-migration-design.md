@@ -104,7 +104,27 @@ Forme du fichier :
 - **Écriture atomique** : `json.dump` → `state.json.tmp` → `os.replace`. Le process écrit à chaque refresh de token ; une coupure ne doit pas laisser un JSON tronqué qui rendrait le bot non démarrable.
 - **Purge à l'écriture** : les entrées `notifications` antérieures au jour courant (UTC) sont supprimées, ce qui borne la taille du fichier sans job de nettoyage.
 - **`chmod 0600`** à la création.
-- **Bootstrap** : si `state.json` est absent au démarrage, il est initialisé depuis `ACCESS_TOKEN` / `REFRESH_TOKEN` / `TGTG_COOKIE` / `LAST_TIME_TOKEN_REFRESHED` du `.env`. Ensuite `state.json` fait autorité et ces variables ne sont plus jamais relues. Si les tokens sont vides ou morts, le flow login-by-email du client TGTG vendoré sert de secours.
+- **Bootstrap** : si `state.json` est absent au démarrage, il est initialisé depuis `ACCESS_TOKEN` / `REFRESH_TOKEN` / `TGTG_COOKIE` / `LAST_TIME_TOKEN_REFRESHED` **et `USER_LANGUAGE`** du `.env`. Ensuite `state.json` fait autorité et ces variables ne sont plus jamais relues. Si les tokens sont vides ou morts, le flow login-by-email du client TGTG vendoré sert de secours.
+
+### ⚠️ Le piège du seed à sens unique
+
+Le seed depuis `.env` **ne joue qu'une fois**, à la création de `state.json`. Ensuite le `.env` est ignoré pour tout ce qui est état.
+
+Conséquence : **modifier `ACCESS_TOKEN` dans le `.env` puis redéployer n'a aucun effet.** `deploy.sh` pousse bien le nouveau `.env`, mais le bot continue de lire `state.json`. Pour forcer de nouveaux tokens, il faut supprimer `state.json` sur le VPS :
+
+```bash
+ssh $VPS_USER@$VPS_HOST "rm $VPS_BOT_PATH/state.json"
+# puis redéployer, ou juste redémarrer la session tmux
+```
+
+C'est le prix à payer pour que `deploy.sh` n'écrase jamais une session TGTG fraîche. Le comportement est volontaire, mais contre-intuitif à froid — et typiquement le genre de chose qu'on ne retrouve pas quand le bot est muet à 3h du matin.
+
+**Cette mise en garde doit être répétée à quatre endroits** (à traiter en étapes 3 et 4, et vérifiable) :
+
+1. l'en-tête de commentaire de `scripts/deploy.sh` ;
+2. une section « Dépannage » du `README.md` ;
+3. `CLAUDE.md`, dans la description de la couche d'état ;
+4. la docstring de `StateStore.get_tgtg_credentials`.
 
 ## 3. Secrets et déploiement
 
@@ -114,7 +134,8 @@ Forme du fichier :
 |---|---|
 | `USER_EMAIL`, `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID` | restent — vrais secrets runtime |
 | `ACCESS_TOKEN`, `REFRESH_TOKEN`, `TGTG_COOKIE`, `LAST_TIME_TOKEN_REFRESHED` | restent, en **seed initial uniquement** |
-| `COOLDOWN_END_TIME`, `USER_LANGUAGE` | **partent** dans `state.json` (état, pas config) |
+| `USER_LANGUAGE` | reste, en **seed initial uniquement** ; `state.json` fait autorité après le 1er démarrage |
+| `COOLDOWN_END_TIME` | **part** dans `state.json` (état pur, jamais seedé) |
 | `AWS_ACCOUNT_ID`, `DEFAULT_AWS_REGION` | **supprimées** |
 | `VPS_USER`, `VPS_HOST`, `VPS_BOT_PATH`, `SSH_KEY` | **ajoutées**, lues par `deploy.sh` |
 
