@@ -37,6 +37,11 @@ coverage.xml
 .env
 .env.yml
 
+# Runtime state (contient les tokens TGTG en clair)
+state.json
+state.json.tmp
+logs/
+
 # Conda
 conda_packages.txt
 
