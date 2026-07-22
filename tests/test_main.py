@@ -7,7 +7,7 @@ from freezegun import freeze_time
 
 from app.core.scheduler import Scheduler
 from app.core.state import StateStore
-from app.main import build_application, monitor_job
+from app.main import _arm_monitoring, build_application, monitor_job
 
 
 class TestMonitorJob(unittest.IsolatedAsyncioTestCase):
@@ -86,6 +86,37 @@ class TestMonitorJob(unittest.IsolatedAsyncioTestCase):
         self.context.job_queue.run_once.assert_called_once()
         _, kwargs = self.context.job_queue.run_once.call_args
         self.assertEqual(kwargs.get("when"), Scheduler.OFF_WINDOW_RETRY_MINUTES * 60)
+        self.assertEqual(kwargs.get("job_kwargs"), {"misfire_grace_time": None})
+
+    @freeze_time("2026-07-22 10:30:00")
+    async def test_finally_does_not_double_arm_when_logging_fails_after_successful_arm(self):
+        """Finding 5 regression: an exception raised AFTER a successful arm (e.g.
+        formatting the "scheduled in Xs" log) must not fall through to the
+        fallback re-arm - that would arm a second "monitoring" job even though
+        _arm_monitoring() itself is correct."""
+        self.scheduler.next_delay_seconds = MagicMock(return_value="not-a-number")
+        with patch("app.main.TgtgServiceMonitor"):
+            await monitor_job(self.context)
+
+        self.context.job_queue.run_once.assert_called_once()
+
+    def test_arm_monitoring_cancels_pending_job_before_arming_new_one(self):
+        """Finding 1 regression: at most one "monitoring" job may ever be pending.
+        A caller racing with a job already armed (e.g. /wakeup firing while a
+        pass is in flight) must cancel it first, then arm exactly one - never
+        end up with two concurrent monitoring chains."""
+        job_queue = MagicMock()
+        pending_job = MagicMock()
+        job_queue.get_jobs_by_name.return_value = [pending_job]
+
+        _arm_monitoring(job_queue, 0)
+
+        pending_job.schedule_removal.assert_called_once()
+        job_queue.get_jobs_by_name.assert_called_once_with("monitoring")
+        job_queue.run_once.assert_called_once()
+        _, kwargs = job_queue.run_once.call_args
+        self.assertEqual(kwargs.get("name"), "monitoring")
+        self.assertEqual(kwargs.get("when"), 0)
         self.assertEqual(kwargs.get("job_kwargs"), {"misfire_grace_time": None})
 
 
