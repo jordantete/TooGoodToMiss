@@ -1,38 +1,5 @@
 import pytest
-from unittest.mock import MagicMock
-from app.core.scheduler import Scheduler
-from app.services.tgtg_service_monitor import TgtgServiceMonitor
 from app.services.tgtg_service.models import ItemDetails, Store, Item, PickupInterval, PickupLocation, PriceInfo, Picture, Address
-
-@pytest.fixture
-def mock_dynamodb_table():
-    with MagicMock() as mock_table:
-        mock_table.scan = MagicMock(return_value={'Items': []})
-        mock_table.put_item = MagicMock()
-        mock_table.delete_item = MagicMock()
-        yield mock_table
-
-@pytest.fixture
-def mock_boto3_resource(mock_dynamodb_table):
-    with MagicMock() as mock_resource:
-        mock_resource.Table.return_value = mock_dynamodb_table
-        return mock_resource
-
-@pytest.fixture
-def mock_tgtg_client():
-    return MagicMock()
-
-@pytest.fixture
-def mock_scheduler():
-    return MagicMock(spec=Scheduler)
-
-@pytest.fixture
-def mock_monitoring_service():
-    mock_service = MagicMock(spec=TgtgServiceMonitor)
-    mock_service._retrieve_and_login = MagicMock()
-    mock_service.check_credentials_ready = MagicMock()
-    mock_service.update_lambda_env_vars = MagicMock()
-    return mock_service
 
 @pytest.fixture
 def mock_item_details():

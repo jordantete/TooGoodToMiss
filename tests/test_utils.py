@@ -1,4 +1,4 @@
-import os, pytest
+import os, pytest, requests
 from unittest.mock import patch, mock_open, MagicMock
 from app.common.utils import Utils
 
@@ -68,7 +68,27 @@ class TestUtils:
     def test_send_telegram_message_failure(self, mock_logger, mock_env_vars, mock_requests):
         Utils.send_telegram_message("Test message")
         mock_requests.assert_called_once()
-        mock_logger.assert_called_once_with("Unexpected error while sending Telegram message: Network error")
+        mock_logger.assert_called_once_with("Unexpected error while sending Telegram message: Network error.")
+
+    @patch("app.common.logger.LOGGER.error")
+    def test_send_telegram_message_http_error_does_not_leak_token(self, mock_logger, mock_env_vars):
+        """Finding 3 regression: the real leak was in the RequestException branch -
+        HTTPError.__str__ from raise_for_status() embeds the full request URL,
+        which contains the Telegram bot token."""
+        mock_response = MagicMock()
+        mock_response.status_code = 401
+        http_error = requests.HTTPError(
+            "401 Client Error: Unauthorized for url: https://api.telegram.org/bottest_bot_token/sendMessage",
+            response=mock_response
+        )
+
+        with patch("requests.get") as mock_requests:
+            mock_requests.return_value.raise_for_status.side_effect = http_error
+            Utils.send_telegram_message("Test message")
+
+        mock_logger.assert_called_once()
+        logged_message = mock_logger.call_args[0][0]
+        assert "test_bot_token" not in logged_message
 
     @patch("requests.get")
     def test_send_telegram_message_missing_bot_token(self, mock_requests):
@@ -81,13 +101,3 @@ class TestUtils:
         with patch.dict(os.environ, {"TELEGRAM_BOT_TOKEN": "test_bot_token"}, clear=True):
             Utils.send_telegram_message("Test message")
             mock_requests.assert_not_called()
-
-    def test_ok_response(self):
-        response = Utils.ok_response()
-        assert response["statusCode"] == 200
-        assert response["body"] == '"ok"'
-
-    def test_error_response(self):
-        response = Utils.error_response("An error occurred")
-        assert response["statusCode"] == 400
-        assert response["body"] == '"An error occurred"'

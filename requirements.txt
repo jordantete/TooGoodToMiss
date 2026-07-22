@@ -1,5 +1,5 @@
 pydantic
-python-telegram-bot
+python-telegram-bot[job-queue]
 python_dateutil
 pytz
 python-dotenv

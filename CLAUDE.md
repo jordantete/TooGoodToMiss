@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-**TooGoodToMiss** is a serverless Telegram bot that monitors TooGoodToGo (TGTG) favorite magic bags and notifies the user when items become available. It runs as three AWS Lambda functions deployed with the Serverless Framework, backed by DynamoDB and EventBridge. Python 3.10 (Lambda runtime), managed locally with conda.
+**TooGoodToMiss** is a Telegram bot that monitors TooGoodToGo (TGTG) favorite magic bags and notifies the user when items become available. It runs as a single long-lived process (`python -m app.main`), deployed to a VPS via `scripts/deploy.sh` and kept alive in a `tmux` session. Python 3.10+, managed locally with a venv.
 
 ## Behavioral Guidelines (Karpathy / Multica)
 
@@ -42,86 +42,81 @@ For multi-step work, state a brief plan with per-step verification.
 
 ## Commands
 
-**Environment**: conda env named `TooGoodToMiss` (defined in `environment.yml`).
+**Environment**: local venv (`requirements.txt` for runtime, `requirements-dev.txt` for tests).
 
 ```bash
 # Setup
-conda env create -f environment.yml
-conda activate TooGoodToMiss
+python3 -m venv .venv
+./.venv/bin/pip install -r requirements.txt
 
-# Tests (must run inside the conda env — freezegun/pytest-freezegun are not in base)
-conda run -n TooGoodToMiss python -m pytest tests/ -q
-conda run -n TooGoodToMiss python -m pytest tests/test_scheduler.py -q                    # single file
-conda run -n TooGoodToMiss python -m pytest tests/test_scheduler.py::TestScheduler::test_name -q  # single test
-conda run -n TooGoodToMiss python -m pytest --cov=app --cov-report=term
+# Run locally
+python -m app.main
 
-# Deploy (requires .env at repo root — serverless-dotenv-plugin loads it)
-serverless deploy --stage dev
-serverless deploy function --function tooGoodToMissMonitoring   # single function, faster
-serverless logs -f tooGoodToMissMonitoring -t
+# Tests (requires requirements-dev.txt as well)
+./.venv/bin/pip install -r requirements.txt -r requirements-dev.txt
+python -m pytest tests/ -q
+python -m pytest tests/test_scheduler.py -q                    # single file
+python -m pytest tests/test_scheduler.py::TestScheduler::test_name -q  # single test
+python -m pytest --cov=app --cov-report=term
 
-# Rebuild + publish the Lambda layer (only when lambda_layer/requirements_layer.txt changes)
-cd lambda_layer && mkdir -p python
-pip install --platform manylinux2014_x86_64 --target=python --implementation cp \
-    --python-version 3.10 --only-binary=:all: -r requirements_layer.txt
-zip -r lambda_layer.zip python/
-aws lambda publish-layer-version --layer-name TooGoodToMissLayer \
-    --zip-file fileb://lambda_layer.zip --compatible-runtimes python3.10
+# Deploy to the VPS (requires .env at repo root — VPS_USER/VPS_HOST/VPS_BOT_PATH/SSH_KEY)
+./scripts/deploy.sh
 ```
-
-⚠️ `serverless.yaml` pins the layer ARN to a **hardcoded version** (`:3`) on all three functions. Publishing a new layer version requires bumping that number in all three places, otherwise deployed code runs against stale dependencies.
-
-Note: `tests/test_handlers.py::test_tgtg_monitoring_handler_valid_event` and `::test_telegram_webhook_handler` currently fail on `main` — pre-existing, not caused by your change.
 
 ## Architecture
 
-### Three Lambdas, one entry module
+### Single process, one entry point
 
-All handlers live in `app/handlers.py`:
+`app/main.py` builds a single `python-telegram-bot` `Application` and runs it with `run_polling()` — there is no webhook, no API Gateway, no separate scheduler/monitoring/webhook functions. `build_application()` wires `StateStore`, `Scheduler` and `TelegramBotHandler`, then arms the first monitoring pass via `_arm_monitoring(application.job_queue, 0)`.
 
-| Handler | Lambda | Trigger |
-|---|---|---|
-| `lambda_scheduler` | `too-good-to-miss-scheduler` | fixed cron `*/3 10-19 MON-SAT` |
-| `tgtg_monitoring_handler` | `too-good-to-miss-monitoring` | EventBridge rules created at runtime |
-| `telegram_webhook_handler` | `too-good-to-miss-telegram-webhook` | API Gateway `POST /` |
+### The self-rescheduling monitoring job (the non-obvious part)
 
-### The self-scheduling loop (the non-obvious part)
+Monitoring is not a fixed interval. `monitor_job()` (`app/main.py`) runs one pass, then — **in a `finally` block** — computes `Scheduler.next_delay_seconds()` and re-arms itself via `_arm_monitoring()`. This is deliberate: `monitor_job` is the *only* thing that reschedules monitoring, so no code path may return from it without arming a successor. If `next_delay_seconds()` itself raises, the `finally` block falls back to `Scheduler.OFF_WINDOW_RETRY_MINUTES * 60` rather than leaving the loop unarmed.
 
-The monitoring Lambda is **not** on a fixed schedule. `Scheduler.schedule_next_invocation()` (`app/core/scheduler.py`) creates a **one-shot EventBridge rule** named `TooGoodToGo_monitoring_invocation_rule_<YYYYMMDDHHMM>` at a randomized future time, then deletes past-due rules on the next pass. Randomized delays (10–20 min in the morning window, 2–5 min in the afternoon) exist to defeat TGTG anti-bot fingerprinting — do not replace them with a fixed cron.
+`next_delay_seconds()` (`app/core/scheduler.py`) **never returns `None`**: it is the sole re-arming mechanism, so `None` would stop monitoring for good. Randomized delays (10–20 min in the 10:00–12:00 window, 2–5 min in the 12:00–19:00 window, idle on Sunday) exist to defeat TGTG anti-bot fingerprinting — do not replace them with a fixed interval.
 
-`tgtg_monitoring_handler` guards on `event['resources']` matching `MONITORING_EVENT_PATTERN`, so it ignores any event that didn't come from one of those generated rules. Rule name ↔ pattern prefix must stay in sync: `SCHEDULE_RULE_NAME_PREFIX` (`app/common/constants.py`) and `MONITORING_EVENT_PATTERN` (`app/handlers.py`) are two copies of the same string.
+**At most one monitoring job at any time** is an invariant, not an accident: `_arm_monitoring()` cancels every pending job named `"monitoring"` before scheduling a new one, specifically to cover a caller (e.g. `/wakeup`) racing an in-flight pass that will also re-arm in its own `finally`. Two concurrent chains would double the TGTG call cadence and defeat the anti-fingerprinting delays. **Any new code path that needs to (re)arm monitoring must call `_arm_monitoring()` — never `job_queue.run_once(monitor_job, ...)` directly.**
 
-### Lambda env vars are mutable runtime state
+Every `run_once()` call — inside `_arm_monitoring()` — passes `job_kwargs={"misfire_grace_time": None}`. Without it, APScheduler silently drops a job that fires more than ~1 second late (e.g. the process was momentarily busy), and since `monitor_job` is the only re-arming mechanism, **the monitoring loop stops for good, with nothing in the logs to flag it**. This is the project's #1 failure mode — don't add a `run_once` for this job without it.
 
-There is no secrets store or state table for credentials — the app rewrites its own Lambda configuration via `Utils.update_lambda_env_vars()` (`lambda:UpdateFunctionConfiguration`):
+### `state.json` is the single source of runtime state
 
-- `ACCESS_TOKEN` / `REFRESH_TOKEN` / `TGTG_COOKIE` / `LAST_TIME_TOKEN_REFRESHED` — rotated by `TgtgServiceMonitor.update_credentials_env_vars()` whenever `TgtgClient` refreshes the TGTG session. Written on the **monitoring** Lambda.
-- `COOLDOWN_END_TIME` — the pause flag. Written on the **monitoring** Lambda, read by both `Scheduler.is_bot_paused()` and `schedule_next_invocation()`.
-- `USER_LANGUAGE` — written on the **telegram-webhook** Lambda by the language selector.
+`StateStore` (`app/core/state.py`) is the single source of runtime state — TGTG session, cooldown end time, user language, notification de-dup — persisted to `state.json` at the repo root (path overridable via `STATE_FILE`). Every mutation writes atomically (temp file + `os.replace`) so a crash mid-write never truncates it. The file is gitignored and **`scripts/deploy.sh` never pushes it** to the VPS.
 
-Consequence: a `serverless deploy` overwrites these with the values from `.env`, resetting live tokens and cooldown. Prefer `deploy function` for code-only changes, and be aware env-var writes are cross-function (the webhook Lambda mutates the monitoring Lambda's config).
+**The one-way seed trap**: `StateStore._seed_from_env()` reads `ACCESS_TOKEN` / `REFRESH_TOKEN` / `TGTG_COOKIE` / `LAST_TIME_TOKEN_REFRESHED` / `USER_LANGUAGE` from the environment, but only the **first time** `state.json` doesn't exist yet. After that, `state.json` is authoritative — editing `.env` and redeploying has **no effect** while it's present on the VPS. This is deliberate: overwriting a live TGTG session with a stale local copy on every deploy would force a re-login and trigger a CAPTCHA. To force new tokens, delete the file on the VPS and redeploy:
+
+```bash
+ssh $VPS_USER@$VPS_HOST "rm $VPS_BOT_PATH/state.json"
+./scripts/deploy.sh
+```
+
+(Same warning lives in `scripts/deploy.sh`, `README.md` and the `StateStore.get_tgtg_credentials()` docstring — keep all four in sync if this changes.)
 
 ### Cooldown / anti-bot flow
 
-TGTG CAPTCHA → `TgtgService` detects `"captcha"` in the error string → raises `ForbiddenError` → `TgtgServiceMonitor._monitor_favorites()` calls `scheduler.activate_cooldown()` (default 30 min) → `COOLDOWN_END_TIME` set → both the scheduler and the monitoring handler short-circuit until it expires. The user can pause/resume manually from Telegram (`/pause`, `/wakeup`, `/status`).
+TGTG CAPTCHA → `TgtgService` detects `"captcha"` in the error string → raises `ForbiddenError` → `TgtgServiceMonitor._monitor_favorites()` calls `scheduler.activate_cooldown()` (default 30 min) → `state.json`'s `cooldown_end_time` is set → both `Scheduler.should_monitor_now()` and `next_delay_seconds()` short-circuit until it expires. The user can pause/resume manually from Telegram (`/pause`, `/wakeup`, `/status`).
 
 ### Notification de-duplication
 
-DynamoDB table `UserNotifications` (`storeId` HASH, `lastNotificationDate` RANGE). `TgtgService.get_notification_messages()` emits a message only when `items_available > 0` **and** no notification was recorded for that store today (UTC). `DatabaseHandler.get_items()` uses `scan` with a filter, not `query` — full-table scan by design given the tiny table.
+`StateStore` keeps a `notifications` map (`store_id` → last-notified date, UTC) in `state.json`, pruned to today's entries on every write. `TgtgService.get_notification_messages()` emits a message only when `items_available > 0` **and** `StateStore.was_notified_today()` is false for that store.
 
 ### Vendored TGTG client
 
 `app/services/tgtg_service/tgtg_client.py` is a **vendored fork** of the `tgtg` PyPI package (the dependency was deliberately removed — see commits `7600589` / `1bb5131`). It owns login-by-email polling, token refresh, and the `datadome` cookie. When TGTG changes its API (endpoint versions like `item/v8/`, `auth/v5/`, or headers), patch this file — there is no upstream to bump.
 
+### Logging silences third-party loggers on purpose
+
+`app/common/logger.py` sets `httpx`, `httpcore`, `telegram` and `apscheduler` to `WARNING`. `httpx` logs the full request URL at INFO on every polling call, including `https://api.telegram.org/bot<TOKEN>/getUpdates` — and unlike CloudWatch, `logs/app.log` is a persistent file on the VPS. **Never raise these loggers back to INFO without first masking the token.**
+
 ### Layers
 
-`app/core/` — infrastructure-facing (`scheduler.py` = EventBridge/Lambda, `database_handler.py` = DynamoDB, `telegram_bot_handler.py` = python-telegram-bot wiring).
+`app/core/` — `scheduler.py` (delay/window logic), `state.py` (`state.json` persistence), `telegram_bot_handler.py` (python-telegram-bot wiring).
 `app/services/` — domain (`tgtg_service_monitor.py` orchestrates a monitoring run, `tgtg_service/` holds the client, pydantic `models.py` for the TGTG payload, and `notification_formatter.py`).
-`app/common/` — `utils.py` (env vars, Telegram send, localization, Lambda env mutation), `constants.py`, `localizable.json`.
+`app/common/` — `utils.py` (env vars, Telegram send, localization), `constants.py`, `localizable.json`, `logger.py`.
 
 ### Telegram bot
 
-`TelegramBotHandler` runs python-telegram-bot in **webhook mode inside a Lambda invocation**: `initialize()` → `process_update()` → `shutdown()` per request, with no persistent application state. Any per-user state must go to DynamoDB or env vars.
+`TelegramBotHandler` wraps python-telegram-bot's `Application` and runs continuously via `run_polling()` — no per-request `initialize()`/`shutdown()`, no webhook. Per-user state (language, cooldown) goes through `StateStore`, not env vars.
 
 All user-facing strings live in `app/common/localizable.json` under `en` / `fr` — add a key to **both** locales; `Utils.localize()` returns `""` (silently blank message) on a missing key. Every command has a paired inline button; adding a command means touching `_register_handlers`, `_callback_query_handler`, `_set_bot_commands`, and both locale blocks.
 
@@ -129,5 +124,5 @@ All user-facing strings live in `app/common/localizable.json` under `en` / `fr` 
 
 - Multi-line signature style (one parameter per line) is used across the codebase — match it.
 - Logging via `app.common.logger.LOGGER` only. Existing logs print raw tokens/credentials at INFO; don't add new ones.
-- Errors: custom exceptions in `app/core/exceptions.py` (DB) and `app/services/tgtg_service/exceptions.py` (TGTG). `_monitor_favorites` is the single place that maps exception type → user-facing Telegram message + cooldown decision.
-- Tests use `unittest.TestCase` classes with `unittest.mock`, `freezegun` for time, and shared fixtures in `tests/conftest.py`. Test files mirror the module they cover; boto3 clients are always mocked (no moto).
+- Errors: custom exceptions in `app/services/tgtg_service/exceptions.py`. `_monitor_favorites` is the single place that maps exception type → user-facing Telegram message + cooldown decision.
+- Tests use `unittest.TestCase` classes with `unittest.mock`, `freezegun` for time, and shared fixtures in `tests/conftest.py`. Test files mirror the module they cover.

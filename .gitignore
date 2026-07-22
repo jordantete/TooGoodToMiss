@@ -19,8 +19,6 @@ var/
 *.egg-info/
 .installed.cfg
 *.egg
-node_modules
-.serverless/
 
 # Installer logs
 pip-log.txt
@@ -37,12 +35,10 @@ coverage.xml
 .env
 .env.yml
 
-# Conda
-conda_packages.txt
+# Runtime state (contient les tokens TGTG en clair)
+state.json
+state.json.tmp*
+logs/
 
 # VSCode
 .vscode/
-
-# Ignore Lambda Layer Artifacts
-lambda_layer.zip
-python/

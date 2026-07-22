@@ -1,11 +1,10 @@
-import json
-from typing import Dict, Optional
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, BotCommand
-from telegram.ext import ApplicationBuilder, ContextTypes, CommandHandler, CallbackQueryHandler, MessageHandler, filters
+from telegram.ext import Application, ApplicationBuilder, ContextTypes, CommandHandler, CallbackQueryHandler, MessageHandler, filters
 from telegram.constants import ParseMode
 from app.common.utils import Utils
 from app.common.logger import LOGGER
 from app.core.scheduler import Scheduler
+from app.core.state import StateStore
 from app.common.constants import WELCOME_GIF_URL
 
 CALLBACK_DATA_START = "start"
@@ -20,21 +19,28 @@ LANGUAGE_OPTIONS = {"en": "🇬🇧 English", "fr": "🇫🇷 Français"}
 
 class TelegramBotHandler:
     def __init__(
-        self, 
-        scheduler: Scheduler
+        self,
+        scheduler: Scheduler,
+        state: StateStore
     ):
         LOGGER.info("Initializing TelegramBotHandler")
         telegram_token = Utils.get_environment_variable("TELEGRAM_BOT_TOKEN")
-        self.application = ApplicationBuilder().token(telegram_token).build()
+        self.application = (
+            ApplicationBuilder()
+            .token(telegram_token)
+            .post_init(self._on_startup)
+            .build()
+        )
         self.localizable_strings = Utils.load_localizable_data()
         self.chat_id = Utils.get_environment_variable("TELEGRAM_CHAT_ID")
-        self.user_language = Utils.get_environment_variable("USER_LANGUAGE", default="en")
-        aws_account_id = Utils.get_environment_variable("AWS_ACCOUNT_ID")
-        aws_region = Utils.get_environment_variable("DEFAULT_AWS_REGION")
-        self.telegram_lambda_arn = f"arn:aws:lambda:{aws_region}:{aws_account_id}:function:too-good-to-miss-telegram-webhook"
+        self.state = state
         self.scheduler = scheduler
         self._register_handlers()
         LOGGER.info(f"TelegramBotHandler initialized with: user_language={self.user_language}")
+
+    @property
+    def user_language(self) -> str:
+        return self.state.get_language()
 
     def _register_handlers(self) -> None:
         """Register Telegram command handlers."""
@@ -88,9 +94,9 @@ class TelegramBotHandler:
     
     async def _bot_status_handler(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         LOGGER.info("Checking if the bot is paused.")
-        is_in_cooldown, remaining_time = self.scheduler._is_in_cooldown()
+        remaining_time = self.scheduler.cooldown_remaining()
 
-        if is_in_cooldown:
+        if remaining_time is not None:
             remaining_time_str = Utils.format_remaining_time(remaining_time)
             message = self._get_localized_text("bot_is_paused_message").format(remaining_time=remaining_time_str)
         else:
@@ -101,8 +107,12 @@ class TelegramBotHandler:
     
     async def _wake_up_bot_handler(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         """Handle 'Wake Up Bot' command."""
+        from app.main import _arm_monitoring  # local import to avoid a circular import with app.main
+
         chat_id = update.effective_chat.id
         self.scheduler.remove_cooldown()
+        _arm_monitoring(context.job_queue, 0)
+
         success_message = self._get_localized_text("bot_wake_up_message")
         await context.bot.send_message(chat_id=chat_id, text=success_message, parse_mode=ParseMode.HTML)
 
@@ -204,9 +214,7 @@ class TelegramBotHandler:
         LOGGER.info(f"User selected language: {selected_language}")
         chat_id = update.effective_chat.id
 
-        new_env_vars = {"USER_LANGUAGE": selected_language}
-        Utils.update_lambda_env_vars(self.telegram_lambda_arn, new_env_vars)
-        self.user_language = selected_language
+        self.state.set_language(selected_language)
         await query.answer()
         text = self._get_localized_text("language-message").format(language=LANGUAGE_OPTIONS[selected_language])
         await context.bot.send_message(chat_id=chat_id, text=text, parse_mode=ParseMode.HTML)
@@ -271,18 +279,9 @@ class TelegramBotHandler:
         ]
         await self.application.bot.set_my_commands(commands)
     
-    async def start(self, event: Dict) -> None:
-        """Process incoming Telegram webhook event."""
-        try:
-            LOGGER.info("Starting TelegramNotifier application.")
-            await self.application.initialize()
-            await self._set_bot_commands()
-            update = Update.de_json(json.loads(event["body"]), self.application.bot)
-            await self.application.process_update(update)
-
-        except Exception as e:
-            LOGGER.error(f"Error in TelegramNotifier: {e}")
-
-        finally:
-            await self.application.shutdown()
-            LOGGER.info("TelegramNotifier application shutdown.")
+    async def _on_startup(
+        self,
+        application: Application
+    ) -> None:
+        """Register bot commands once, when the application starts."""
+        await self._set_bot_commands()
