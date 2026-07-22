@@ -42,7 +42,7 @@ For multi-step work, state a brief plan with per-step verification.
 
 ## Commands
 
-**Environment**: local venv (`requirements.txt`).
+**Environment**: local venv (`requirements.txt` for runtime, `requirements-dev.txt` for tests).
 
 ```bash
 # Setup
@@ -52,7 +52,8 @@ python3 -m venv .venv
 # Run locally
 python -m app.main
 
-# Tests
+# Tests (requires requirements-dev.txt as well)
+./.venv/bin/pip install -r requirements.txt -r requirements-dev.txt
 python -m pytest tests/ -q
 python -m pytest tests/test_scheduler.py -q                    # single file
 python -m pytest tests/test_scheduler.py::TestScheduler::test_name -q  # single test

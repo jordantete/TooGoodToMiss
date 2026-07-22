@@ -37,7 +37,7 @@ coverage.xml
 
 # Runtime state (contient les tokens TGTG en clair)
 state.json
-state.json.tmp
+state.json.tmp*
 logs/
 
 # VSCode

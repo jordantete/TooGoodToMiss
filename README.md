@@ -43,6 +43,13 @@ cp .env.example .env   # puis renseigner les valeurs
 ./.venv/bin/python -m app.main
 ```
 
+## Lancer les tests
+
+```bash
+./.venv/bin/pip install -r requirements.txt -r requirements-dev.txt
+./.venv/bin/python -m pytest tests/ -q
+```
+
 ## Déployer sur un VPS
 
 Renseigner `VPS_USER`, `VPS_HOST`, `VPS_BOT_PATH` et `SSH_KEY` dans `.env`, puis :

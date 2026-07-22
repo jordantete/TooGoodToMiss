@@ -34,11 +34,11 @@ fi
 : "${SSH_KEY:=$HOME/.ssh/id_ed25519}"
 TMUX_SESSION="toogoodtomiss"
 
-SSH_CMD="ssh -i $SSH_KEY $VPS_USER@$VPS_HOST"
+SSH_CMD=(ssh -i "$SSH_KEY" "$VPS_USER@$VPS_HOST")
 
 echo "=== Deploiement vers $VPS_HOST:$VPS_BOT_PATH ==="
 
-$SSH_CMD "mkdir -p $VPS_BOT_PATH"
+"${SSH_CMD[@]}" "mkdir -p \"$VPS_BOT_PATH\""
 
 rsync -av --delete \
     --exclude '.env' \
@@ -54,14 +54,14 @@ rsync -av --delete \
 
 rsync -av -e "ssh -i $SSH_KEY" "$ENV_FILE" "$VPS_USER@$VPS_HOST:$VPS_BOT_PATH/.env"
 
-$SSH_CMD "cd $VPS_BOT_PATH && \
+"${SSH_CMD[@]}" "cd \"$VPS_BOT_PATH\" && \
     { [ -d .venv ] || python3 -m venv .venv; } && \
     ./.venv/bin/pip install --quiet --upgrade pip && \
     ./.venv/bin/pip install --quiet -r requirements.txt"
 
-$SSH_CMD "tmux kill-session -t $TMUX_SESSION 2>/dev/null || true; \
-    tmux new-session -d -s $TMUX_SESSION 'cd $VPS_BOT_PATH && ./scripts/start.sh'"
+"${SSH_CMD[@]}" "tmux kill-session -t $TMUX_SESSION 2>/dev/null || true; \
+    tmux new-session -d -s $TMUX_SESSION 'cd \"$VPS_BOT_PATH\" && ./scripts/start.sh'"
 
 echo "=== Deploiement termine ==="
-echo "Logs   : $SSH_CMD 'tail -f $VPS_BOT_PATH/logs/app.log'"
-echo "Session: $SSH_CMD 'tmux attach -t $TMUX_SESSION'   (detacher : Ctrl-b puis d)"
+echo "Logs   : ${SSH_CMD[*]} 'tail -f $VPS_BOT_PATH/logs/app.log'"
+echo "Session: ${SSH_CMD[*]} 'tmux attach -t $TMUX_SESSION'   (detacher : Ctrl-b puis d)"

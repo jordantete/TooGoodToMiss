@@ -1,6 +1,7 @@
 import json
 import os
 import pytz
+import tempfile
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -87,14 +88,30 @@ class StateStore:
         self,
         state: dict
     ) -> None:
-        """Write atomically: temp file then os.replace, so a crash never truncates state.json."""
+        """
+        Write atomically: unique temp file (same directory as state.json) then
+        os.replace, so a crash never truncates state.json.
+
+        The temp file name is unique per call (tempfile.mkstemp) rather than a
+        fixed "state.json.tmp" - two overlapping writes (e.g. /wakeup racing a
+        monitoring pass in another thread) would otherwise share one temp file
+        and interleave into invalid JSON. Same directory keeps os.replace atomic
+        (only guaranteed within a single filesystem).
+        """
         self._prune_notifications(state)
-        tmp_path = Path(str(self.path) + ".tmp")
-        fd = os.open(tmp_path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
-        os.fchmod(fd, 0o600)
-        with os.fdopen(fd, "w", encoding="utf-8") as state_file:
-            json.dump(state, state_file, indent=2)
-        os.replace(tmp_path, self.path)
+        fd, tmp_name = tempfile.mkstemp(
+            dir=self.path.parent,
+            prefix=f"{self.path.name}.tmp."
+        )
+        tmp_path = Path(tmp_name)
+        try:
+            os.fchmod(fd, 0o600)
+            with os.fdopen(fd, "w", encoding="utf-8") as state_file:
+                json.dump(state, state_file, indent=2)
+            os.replace(tmp_path, self.path)
+        except BaseException:
+            tmp_path.unlink(missing_ok=True)
+            raise
 
     def _save(self) -> None:
         self._write(self._state)

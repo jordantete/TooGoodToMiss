@@ -97,6 +97,7 @@ def main() -> None:
         build_application().run_polling()
     except InvalidToken:
         LOGGER.error("Telegram token rejected by the server - check TELEGRAM_BOT_TOKEN.")
+        raise SystemExit(1)
 
 if __name__ == "__main__":
     main()

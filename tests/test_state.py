@@ -1,5 +1,6 @@
 import json
 import os
+import threading
 import unittest
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -84,20 +85,56 @@ class TestStateStore(unittest.TestCase):
         store.set_language("en")
         self.assertEqual(os.stat(self.path).st_mode & 0o777, 0o600)
 
-    def test_orphan_tmp_with_loose_permissions_tightened_on_write(self):
-        """Regression test: orphan .tmp file with 0644 should not propagate loose perms to state.json."""
-        tmp_path = Path(str(self.path) + ".tmp")
-        # Create an orphan .tmp file with loose permissions (as if from a crash)
-        tmp_path.write_text("{}", encoding="utf-8")
-        os.chmod(tmp_path, 0o644)
-        self.assertEqual(os.stat(tmp_path).st_mode & 0o777, 0o644)
+    def test_orphan_tmp_with_loose_permissions_does_not_affect_new_writes(self):
+        """Regression test: a stale orphan tmp file (e.g. left behind by a crash)
+        with loose permissions must not affect the permissions of state.json -
+        each write uses its own unique temp file, not a shared/reused one."""
+        orphan_path = self.path.parent / f"{self.path.name}.tmp.orphan"
+        orphan_path.write_text("{}", encoding="utf-8")
+        os.chmod(orphan_path, 0o644)
+        self.assertEqual(os.stat(orphan_path).st_mode & 0o777, 0o644)
 
         # Now instantiate StateStore, which triggers one write (via seed)
         store = self._store()
 
-        # The .tmp file should be gone (replaced), and state.json should be 0600
-        self.assertFalse(tmp_path.exists(), "tmp file should be cleaned up by os.replace")
-        self.assertEqual(os.stat(self.path).st_mode & 0o777, 0o600, "state.json must be 0o600 even when .tmp had loose perms")
+        # The orphan is untouched (unrelated file), state.json is still 0600
+        self.assertEqual(os.stat(orphan_path).st_mode & 0o777, 0o644)
+        self.assertEqual(os.stat(self.path).st_mode & 0o777, 0o600, "state.json must be 0o600 regardless of unrelated orphan tmp files")
+
+    def test_concurrent_writes_leave_state_file_valid_and_no_orphan_tmp(self):
+        """Regression test: two threads writing through the same StateStore
+        concurrently (e.g. /wakeup racing an in-flight monitoring pass) must
+        never interleave into a corrupt state.json, and must never leave an
+        orphan temp file behind."""
+        store = self._store()
+        errors = []
+
+        def writer(language: str) -> None:
+            for _ in range(30):
+                try:
+                    store.set_language(language)
+                except Exception as e:  # noqa: BLE001 - capturing to fail the test, not swallow
+                    errors.append(e)
+                    return
+
+        threads = [
+            threading.Thread(target=writer, args=("en",)),
+            threading.Thread(target=writer, args=("fr",)),
+        ]
+        for thread in threads:
+            thread.start()
+        for thread in threads:
+            thread.join()
+
+        self.assertEqual(errors, [], f"concurrent writes raised: {errors}")
+
+        # state.json must always be valid, parsable JSON after concurrent writes.
+        on_disk = json.loads(self.path.read_text(encoding="utf-8"))
+        self.assertIn(on_disk.get("user_language"), ("en", "fr"))
+
+        # No leftover temp files from any of the writes.
+        leftovers = list(self.path.parent.glob(f"{self.path.name}.tmp*"))
+        self.assertEqual(leftovers, [])
 
     @freeze_time("2026-07-22 10:00:00")
     def test_cooldown_active_then_expired(self):
