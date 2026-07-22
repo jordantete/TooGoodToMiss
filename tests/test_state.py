@@ -74,6 +74,16 @@ class TestStateStore(unittest.TestCase):
         store = self._store()
         self.assertEqual(store.get_tgtg_credentials().access_token, "seed-access")
 
+    def test_valid_json_but_non_dict_root_is_reseeded_not_fatal(self):
+        self.path.write_text("[1, 2, 3]", encoding="utf-8")
+        store = self._store()
+        self.assertEqual(store.get_tgtg_credentials().access_token, "seed-access")
+
+    def test_permissions_stay_0600_after_second_write(self):
+        store = self._store()
+        store.set_language("en")
+        self.assertEqual(os.stat(self.path).st_mode & 0o777, 0o600)
+
     @freeze_time("2026-07-22 10:00:00")
     def test_cooldown_active_then_expired(self):
         store = self._store()

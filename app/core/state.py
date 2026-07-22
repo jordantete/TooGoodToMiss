@@ -39,9 +39,14 @@ class StateStore:
 
         try:
             with self.path.open("r", encoding="utf-8") as state_file:
-                return json.load(state_file)
+                loaded = json.load(state_file)
 
-        except (json.JSONDecodeError, OSError) as e:
+            if not isinstance(loaded, dict):
+                raise ValueError(f"State file root must be a JSON object, got {type(loaded).__name__}")
+
+            return loaded
+
+        except (json.JSONDecodeError, OSError, ValueError) as e:
             LOGGER.error(f"Unreadable state file at {self.path}: {e}. Re-seeding from environment.")
             state = self._seed_from_env()
             self._write(state)
@@ -85,9 +90,9 @@ class StateStore:
         """Write atomically: temp file then os.replace, so a crash never truncates state.json."""
         self._prune_notifications(state)
         tmp_path = Path(str(self.path) + ".tmp")
-        with tmp_path.open("w", encoding="utf-8") as state_file:
+        fd = os.open(tmp_path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+        with os.fdopen(fd, "w", encoding="utf-8") as state_file:
             json.dump(state, state_file, indent=2)
-        os.chmod(tmp_path, 0o600)
         os.replace(tmp_path, self.path)
 
     def _save(self) -> None:
