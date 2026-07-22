@@ -84,6 +84,21 @@ class TestStateStore(unittest.TestCase):
         store.set_language("en")
         self.assertEqual(os.stat(self.path).st_mode & 0o777, 0o600)
 
+    def test_orphan_tmp_with_loose_permissions_tightened_on_write(self):
+        """Regression test: orphan .tmp file with 0644 should not propagate loose perms to state.json."""
+        tmp_path = Path(str(self.path) + ".tmp")
+        # Create an orphan .tmp file with loose permissions (as if from a crash)
+        tmp_path.write_text("{}", encoding="utf-8")
+        os.chmod(tmp_path, 0o644)
+        self.assertEqual(os.stat(tmp_path).st_mode & 0o777, 0o644)
+
+        # Now instantiate StateStore, which triggers one write (via seed)
+        store = self._store()
+
+        # The .tmp file should be gone (replaced), and state.json should be 0600
+        self.assertFalse(tmp_path.exists(), "tmp file should be cleaned up by os.replace")
+        self.assertEqual(os.stat(self.path).st_mode & 0o777, 0o600, "state.json must be 0o600 even when .tmp had loose perms")
+
     @freeze_time("2026-07-22 10:00:00")
     def test_cooldown_active_then_expired(self):
         store = self._store()

@@ -91,6 +91,7 @@ class StateStore:
         self._prune_notifications(state)
         tmp_path = Path(str(self.path) + ".tmp")
         fd = os.open(tmp_path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+        os.fchmod(fd, 0o600)
         with os.fdopen(fd, "w", encoding="utf-8") as state_file:
             json.dump(state, state_file, indent=2)
         os.replace(tmp_path, self.path)
